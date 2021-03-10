@@ -57,14 +57,14 @@ class Exp_Informer(Exp_Basic):
         args = self.args
 
         data_dict = {
-            'ETTh1':Dataset_ETT_hour,
-            'ETTh2':Dataset_ETT_hour,
-            'ETTm1':Dataset_ETT_minute,
-            'ETTm2':Dataset_ETT_minute,
-            'custom':Dataset_Custom,
+            'ETTh1' : Dataset_ETT_hour,
+            'ETTh2' : Dataset_ETT_hour,
+            'ETTm1' : Dataset_ETT_minute,
+            'ETTm2' : Dataset_ETT_minute,
+            'custom': Dataset_Custom,
         }
         Data = data_dict[self.args.data]
-        timeenc = 0 if args.embed!='timeF' else 1
+        timeenc = 1 if args.embed == 'timeF' else 0
 
         if flag == 'test':
             shuffle_flag = False; drop_last = True; batch_size = args.batch_size
@@ -81,7 +81,7 @@ class Exp_Informer(Exp_Basic):
             timeenc=timeenc,
             freq=args.freq
         )
-        print(flag, len(data_set))
+        print("{0} data length: {1}".format(flag, len(data_set)))
         data_loader = DataLoader(
             data_set,
             batch_size=batch_size,
@@ -96,7 +96,7 @@ class Exp_Informer(Exp_Basic):
         return model_optim
     
     def _select_criterion(self):
-        criterion =  nn.MSELoss()
+        criterion = nn.MSELoss()
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion):
@@ -134,6 +134,7 @@ class Exp_Informer(Exp_Basic):
         train_data, train_loader = self._get_data(flag = 'train')
         vali_data, vali_loader = self._get_data(flag = 'val')
         test_data, test_loader = self._get_data(flag = 'test')
+        print("")
 
         path = './checkpoints/'+setting
         if not os.path.exists(path):
@@ -150,6 +151,8 @@ class Exp_Informer(Exp_Basic):
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
+
+            print("Epoch: {0}, Steps: {1}".format(epoch+1, train_steps))
             
             self.model.train()
             for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(train_loader):
@@ -172,16 +175,16 @@ class Exp_Informer(Exp_Basic):
                 else:
                     outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features=='MS' else 0
+                f_dim = -1 if self.args.features == 'MS' else 0
                 batch_y = batch_y[:,-self.args.pred_len:,f_dim:].to(self.device)
                 loss = criterion(outputs, batch_y)
                 train_loss.append(loss.item())
                 
-                if (i+1) % 100==0:
-                    print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
+                if (i+1) % 10 == 0:
                     speed = (time.time()-time_now)/iter_count
                     left_time = speed*((self.args.train_epochs - epoch)*train_steps - i)
-                    print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
+                    print("\titers: {0}, epoch: {1} | loss: {2:.7f} | speed: {3:.4f}s/iter | left time: {4:.4f}s".format(
+                        i + 1, epoch + 1, loss.item(), speed, left_time))
                     iter_count = 0
                     time_now = time.time()
                 
@@ -192,15 +195,15 @@ class Exp_Informer(Exp_Basic):
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            print("Train Loss: {0:.7f}, Vali Loss: {1:.7f}, Test Loss: {2:.7f}".format(train_loss, vali_loss, test_loss))
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
-                print("Early stopping")
+                print("Early stopping\n")
                 break
 
             adjust_learning_rate(model_optim, epoch+1, self.args)
-            
+            print("")
+
         best_model_path = path+'/'+'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
         

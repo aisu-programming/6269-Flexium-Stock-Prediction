@@ -23,20 +23,20 @@ class Informer(nn.Module):
         self.enc_embedding = DataEmbedding(enc_in, d_model, embed, freq, dropout)
         self.dec_embedding = DataEmbedding(dec_in, d_model, embed, freq, dropout)
         # Attention
-        Attn = ProbAttention if attn=='prob' else FullAttention
+        Attn = ProbAttention if attn == 'prob' else FullAttention
         # Encoder
         self.encoder = Encoder(
-            [
+            attn_layers=[
                 EncoderLayer(
-                    AttentionLayer(Attn(False, factor, attention_dropout=dropout, output_attention=output_attention), 
+                    attention=AttentionLayer(Attn(False, factor, attention_dropout=dropout, output_attention=output_attention), 
                                 d_model, n_heads),
-                    d_model,
-                    d_ff,
+                    d_model=d_model,
+                    d_ff=d_ff,
                     dropout=dropout,
                     activation=activation
                 ) for l in range(e_layers)
             ],
-            [
+            conv_layers=[
                 ConvLayer(
                     d_model
                 ) for l in range(e_layers-1)
@@ -45,14 +45,14 @@ class Informer(nn.Module):
         )
         # Decoder
         self.decoder = Decoder(
-            [
+            layers=[
                 DecoderLayer(
-                    AttentionLayer(Attn(True, factor, attention_dropout=dropout, output_attention=False), 
+                    self_attention=AttentionLayer(Attn(True, factor, attention_dropout=dropout, output_attention=False), 
                                 d_model, n_heads),
-                    AttentionLayer(FullAttention(False, factor, attention_dropout=dropout, output_attention=False), 
+                    cross_attention=AttentionLayer(FullAttention(False, factor, attention_dropout=dropout, output_attention=False), 
                                 d_model, n_heads),
-                    d_model,
-                    d_ff,
+                    d_model=d_model,
+                    d_ff=d_ff,
                     dropout=dropout,
                     activation=activation,
                 )
