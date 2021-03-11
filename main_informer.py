@@ -15,7 +15,7 @@ parser.add_argument('--features', type=str, default='MS', help='forecasting task
 parser.add_argument('--target', type=str, default='Close', help='target feature in S or MS task')
 parser.add_argument('--freq', type=str, default='d', help='freq for time features encoding, options:[t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly]')
 
-parser.add_argument('--seq_len', type=int, default=200, help='input sequence length of Informer encoder')
+parser.add_argument('--seq_len', type=int, default=240, help='input sequence length of Informer encoder')
 parser.add_argument('--label_len', type=int, default=31, help='start token length of Informer decoder')
 parser.add_argument('--pred_len', type=int, default=5, help='prediction sequence length')
 # Informer decoder input: concat[start token series(label_len), zero padding series(pred_len)]
@@ -39,10 +39,10 @@ parser.add_argument('--output_attention', action='store_true', help='whether to 
 parser.add_argument('--num_workers', type=int, default=0, help='data loader num workers')
 parser.add_argument('--itr', type=int, default=5, help='experiments times')
 parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
-parser.add_argument('--batch_size', type=int, default=30, help='batch size of train input data')
+parser.add_argument('--batch_size', type=int, default=40, help='batch size of train input data')
 parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
-parser.add_argument('--des', type=str, default='test',help='exp description')
+parser.add_argument('--tag', type=str, default='test',help='experience tag')
 parser.add_argument('--loss', type=str, default='mse',help='loss function')
 parser.add_argument('--lradj', type=str, default='type1',help='adjust learning rate')
 
@@ -69,12 +69,11 @@ print('Args in experiment:')
 print(args)
 
 Exp = Exp_Informer
+torch.cuda.empty_cache()
 
 for ii in range(args.itr):
     # setting record of experiments
-    setting = '{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model, args.data, args.features, 
-                args.seq_len, args.label_len, args.pred_len,
-                args.d_model, args.n_heads, args.e_layers, args.d_layers, args.d_ff, args.attn, args.factor, args.embed, args.distil, args.des, ii)
+    setting = f"{args.model}_{args.data}_ft{args.features}_sl{args.seq_len}_ll{args.label_len}_pl{args.pred_len}_dm{args.d_model}_nh{args.n_heads}_el{args.e_layers}_dl{args.d_layers}_df{args.d_ff}_at{args.attn}_fc{args.factor}_eb{args.embed}_dt{args.distil}_{args.tag}_{ii}"
 
     exp = Exp(args) # set experiments
     print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
