@@ -1,12 +1,16 @@
 # Select GPU
 sudo nvidia-xconfig -a --cool-bits=28 --allow-empty-initial-configuration
+#sudo nvidia-smi -i 0 -pm ENABLED
 nvidia-settings -a "[gpu:0]/GPUFanControlState=1"
 
 # Set GPU fan / core clock / memory clock / power limit
-nvidia-settings -a "[fan:0]/GPUTargetFanSpeed=75"
-nvidia-settings -a "[gpu:0]/GPUGraphicsClockOffset[3]=-200"
-nvidia-settings -a "[gpu:0]/GPUMemoryTransferRateOffset[3]=-200"
-sudo nvidia-smi -pl 160
+nvidia-settings -a "[fan:0]/GPUTargetFanSpeed=65"
+#nvidia-settings -a "[gpu:0]/GPUGraphicsClockOffset[3]=0"
+#nvidia-settings -a "[gpu:0]/GPUMemoryTransferRateOffset[3]=0"
+#sudo nvidia-smi -pl 175
 
-# Start the Ethminer
-python3 -u main_informer.py --model informer --data custom
+# Start training
+python3 -u main_informer.py
+
+# Reset GPU fan
+nvidia-settings -a "[fan:0]/GPUTargetFanSpeed=30"
