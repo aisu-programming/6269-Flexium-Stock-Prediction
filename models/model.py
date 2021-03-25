@@ -28,8 +28,9 @@ class Informer(nn.Module):
         self.encoder = Encoder(
             attn_layers=[
                 EncoderLayer(
-                    attention=AttentionLayer(Attn(False, factor, attention_dropout=dropout, output_attention=output_attention), 
-                                d_model, n_heads),
+                    attention=AttentionLayer(
+                        Attn(False, factor, attention_dropout=dropout, output_attention=output_attention), 
+                        d_model, n_heads),
                     d_model=d_model,
                     d_ff=d_ff,
                     dropout=dropout,
@@ -37,9 +38,7 @@ class Informer(nn.Module):
                 ) for l in range(e_layers)
             ],
             conv_layers=[
-                ConvLayer(
-                    d_model
-                ) for l in range(e_layers-1)
+                ConvLayer(d_model) for l in range(e_layers-1)
             ] if distil else None,
             norm_layer=torch.nn.LayerNorm(d_model)
         )
@@ -47,10 +46,12 @@ class Informer(nn.Module):
         self.decoder = Decoder(
             layers=[
                 DecoderLayer(
-                    self_attention=AttentionLayer(Attn(True, factor, attention_dropout=dropout, output_attention=False), 
-                                d_model, n_heads),
-                    cross_attention=AttentionLayer(FullAttention(False, factor, attention_dropout=dropout, output_attention=False), 
-                                d_model, n_heads),
+                    self_attention=AttentionLayer(
+                        Attn(True, factor, attention_dropout=dropout, output_attention=False), 
+                        d_model, n_heads),
+                    cross_attention=AttentionLayer(
+                        FullAttention(False, factor, attention_dropout=dropout, output_attention=False), 
+                        d_model, n_heads),
                     d_model=d_model,
                     d_ff=d_ff,
                     dropout=dropout,

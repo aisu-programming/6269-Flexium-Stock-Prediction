@@ -1,23 +1,25 @@
-import argparse
 import os
-import torch
+import time
+import argparse
 
+import torch
 from exp.exp_informer import Exp_Informer
 
 parser = argparse.ArgumentParser(description='[Informer] Long Sequences Forecasting')
 
-parser.add_argument('--model', type=str, required=True, default='informer',help='model of experiment, options: [informer, informerstack, informerlight(TBD)]')
+parser.add_argument('--model', type=str, default='informer',help='model of experiment, options: [informer, informerstack, informerlight(TBD)]')
 
-parser.add_argument('--data', type=str, required=True, default='custom', help='data')
-parser.add_argument('--root_path', type=str, default='./data/test/', help='root path of the data file')
-parser.add_argument('--data_path', type=str, default='6269.csv', help='data file')    
+parser.add_argument('--data', type=str, default='custom', help='data')
+parser.add_argument('--root_path', type=str, default='./data/custom/', help='root path of the data file')
+parser.add_argument('--data_path', type=str, default='6269_rm_front.csv', help='data file')
 parser.add_argument('--features', type=str, default='MS', help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
 parser.add_argument('--target', type=str, default='Close', help='target feature in S or MS task')
+parser.add_argument('--scale', type=bool, default=False, help='scale the dataset (Add by Aisu)')  # Add by Aisu
 parser.add_argument('--freq', type=str, default='d', help='freq for time features encoding, options:[t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly]')
 
-parser.add_argument('--seq_len', type=int, default=240, help='input sequence length of Informer encoder')
-parser.add_argument('--label_len', type=int, default=31, help='start token length of Informer decoder')
-parser.add_argument('--pred_len', type=int, default=5, help='prediction sequence length')
+parser.add_argument('--seq_len', type=int, default=400, help='input sequence length of Informer encoder')
+parser.add_argument('--label_len', type=int, default=300, help='start token length of Informer decoder')
+parser.add_argument('--pred_len', type=int, default=23, help='prediction sequence length')
 # Informer decoder input: concat[start token series(label_len), zero padding series(pred_len)]
 
 parser.add_argument('--enc_in', type=int, default=4, help='encoder input size')
@@ -37,14 +39,13 @@ parser.add_argument('--activation', type=str, default='gelu',help='activation')
 parser.add_argument('--output_attention', action='store_true', help='whether to output attention in ecoder')
 
 parser.add_argument('--num_workers', type=int, default=0, help='data loader num workers')
-parser.add_argument('--itr', type=int, default=5, help='experiments times')
-parser.add_argument('--train_epochs', type=int, default=15, help='train epochs')
-parser.add_argument('--batch_size', type=int, default=40, help='batch size of train input data')
-parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
-parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
-parser.add_argument('--tag', type=str, default='test',help='experience tag')
-parser.add_argument('--loss', type=str, default='mse',help='loss function')
-parser.add_argument('--lradj', type=str, default='type1',help='adjust learning rate')
+parser.add_argument('--itr', type=int, default=1, help='experiments times')
+parser.add_argument('--train_epochs', type=int, default=300, help='train epochs')
+parser.add_argument('--batch_size', type=int, default=25, help='batch size of train input data')
+parser.add_argument('--patience', type=int, default=20, help='early stopping patience')
+parser.add_argument('--loss', type=str, default='mse', help='loss function')
+parser.add_argument('--learning_rate', type=float, default=0.035, help='optimizer learning rate')
+parser.add_argument('--lradj', type=str, default='1.08', help='adjust learning rate')
 
 parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
 parser.add_argument('--gpu', type=int, default=0, help='gpu')
@@ -71,18 +72,28 @@ print(args)
 Exp = Exp_Informer
 torch.cuda.empty_cache()
 
+now = time.localtime()
+now_date = time.strftime('%Y-%m-%d', now)
+now_time = time.strftime('%H.%M.%S', now)
+
 for ii in range(args.itr):
     # setting record of experiments
     # setting = '{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model, args.data, args.features, 
     #             args.seq_len, args.label_len, args.pred_len,
     #             args.d_model, args.n_heads, args.e_layers, args.d_layers, args.d_ff, args.attn, args.factor, args.embed, args.distil, args.des, ii)
-    setting = f"sl{args.seq_len}_ll{args.label_len}_pl{args.pred_len}_dm{args.d_model}_nh{args.n_heads}_el{args.e_layers}_dl{args.d_layers}_df{args.d_ff}_do{args.dropout}_fc{args.factor}_eb{args.embed}_dt{args.distil}_{args.tag}_{ii}"
+    setting = f"{now_date}_{now_time}_bs{args.batch_size}_sl{args.seq_len}_ll{args.label_len}_pl{args.pred_len}_s{args.scale}_do{args.dropout}_lr{args.learning_rate}_lradj{args.lradj}_fc{args.factor}_dt{args.distil}_{ii+1}"
     
+    args.ii = ii + 1
     exp = Exp(args) # set experiments
-    print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+
+    MODEL_DIRECTORY = "results/2021-03-25_02.41.10_bs25_sl400_ll300_pl23_sFalse_do0.05_lr5e-06_lradj1.08_fc5_dtTrue_1"
+    exp.model.load_state_dict(torch.load(f"{MODEL_DIRECTORY}/checkpoint.pth"))
+    exp.model.train()
+
+    print(f">>>>>>> training: {setting} >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     exp.train(setting)
     
-    print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+    print(f">>>>>>> testing: {setting} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
     exp.test(setting)
 
     torch.cuda.empty_cache()

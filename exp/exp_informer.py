@@ -18,6 +18,12 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
+
+# Add by Aisu
+from tqdm import tqdm
+from plot_history import plot_figure
+
+
 class Exp_Informer(Exp_Basic):
     def __init__(self, args):
         super(Exp_Informer, self).__init__(args)
@@ -66,7 +72,7 @@ class Exp_Informer(Exp_Basic):
         Data = data_dict[self.args.data]
         timeenc = 1 if args.embed == 'timeF' else 0
 
-        if flag == 'test':
+        if flag == 'test' or flag == 'predict':
             shuffle_flag = False; drop_last = True; batch_size = args.batch_size
         else:
             shuffle_flag = True; drop_last = True; batch_size = args.batch_size
@@ -78,6 +84,8 @@ class Exp_Informer(Exp_Basic):
             size=[args.seq_len, args.label_len, args.pred_len],
             features=args.features,
             target=args.target,
+            batch_size=args.batch_size,  # Add by Aisu
+            scale=args.scale,            # Add by Aisu
             timeenc=timeenc,
             freq=args.freq
         )
@@ -99,9 +107,12 @@ class Exp_Informer(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
-    def vali(self, vali_data, vali_loader, criterion):
+    def vali(self, vali_data, vali_loader, criterion, scaler):
         self.model.eval()
-        total_loss = []
+
+        scaled_total_loss = []
+        # real_total_loss = []
+
         for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(vali_loader):
             batch_x = batch_x.double().to(self.device)
             batch_y = batch_y.double()
@@ -117,18 +128,25 @@ class Exp_Informer(Exp_Basic):
                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
             else:
                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-            f_dim = -1 if self.args.features=='MS' else 0
+
+            f_dim = -1 if self.args.features == 'MS' else 0
             batch_y = batch_y[:,-self.args.pred_len:,f_dim:].to(self.device)
 
             pred = outputs.detach().cpu()
             true = batch_y.detach().cpu()
 
-            loss = criterion(pred, true) 
+            scaled_loss = criterion(pred, true)
+            scaled_total_loss.append(scaled_loss)
 
-            total_loss.append(loss)
-        total_loss = np.average(total_loss)
+            # real_loss = criterion(scaler.inverse_transform(pred), scaler.inverse_transform(true))
+            # real_total_loss.append(real_loss)
+            
+        scaled_loss = np.average(scaled_total_loss)
+        # real_loss = np.average(real_total_loss)
+
         self.model.train()
-        return total_loss
+        # return scaled_loss, real_loss
+        return scaled_loss, None
         
     def train(self, setting):
         train_data, train_loader = self._get_data(flag = 'train')
@@ -136,7 +154,7 @@ class Exp_Informer(Exp_Basic):
         test_data, test_loader = self._get_data(flag = 'test')
         print("")
 
-        path = './checkpoints/'+setting
+        path = f"results/{setting}"
         if not os.path.exists(path):
             os.makedirs(path)
 
@@ -146,23 +164,25 @@ class Exp_Informer(Exp_Basic):
         early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
         
         model_optim = self._select_optimizer()
-        criterion =  self._select_criterion()
+        criterion = self._select_criterion()
+
+        history = {
+            'scaled': { 'train': [], 'vali': [], 'test': [] },
+            # 'real'  : { 'train': [], 'vali': [], 'test': [] }
+            'learning_rate': []
+        }
 
         for epoch in range(self.args.train_epochs):
-            iter_count = 0
-            train_loss = []
+            scaled_total_loss = []
+            # real_total_loss = []
 
-            print("Epoch: {0}, Steps: {1}".format(epoch+1, train_steps))
-            
             self.model.train()
-            for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(train_loader):
-                iter_count += 1
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(tqdm(train_loader, desc=f"Iteration: {self.args.ii:>2}, Epoch: {epoch+1:>2}", ascii=True)):
                 
                 model_optim.zero_grad()
                 
                 batch_x = batch_x.double().to(self.device)
                 batch_y = batch_y.double()
-                
                 batch_x_mark = batch_x_mark.double().to(self.device)
                 batch_y_mark = batch_y_mark.double().to(self.device)
 
@@ -177,34 +197,48 @@ class Exp_Informer(Exp_Basic):
 
                 f_dim = -1 if self.args.features == 'MS' else 0
                 batch_y = batch_y[:,-self.args.pred_len:,f_dim:].to(self.device)
-                loss = criterion(outputs, batch_y)
-                train_loss.append(loss.item())
                 
-                if (i+1) % 10 == 0:
-                    speed = (time.time()-time_now)/iter_count
-                    left_time = speed*((self.args.train_epochs - epoch)*train_steps - i)
-                    print("\titers: {0}, epoch: {1} | loss: {2:.7f} | speed: {3:.4f}s/iter | left time: {4:.4f}s".format(
-                        i + 1, epoch + 1, loss.item(), speed, left_time))
-                    iter_count = 0
-                    time_now = time.time()
+                scaled_loss = criterion(outputs, batch_y)
+                scaled_total_loss.append(scaled_loss.item())
+
+                # test = train_data.scaler.inverse_transform(outputs.detach().cpu())
+                # print(test[:, :, -2:-1])
+                # real_loss = criterion(test, train_data.scaler.inverse_transform(batch_y.detach().cpu()))
+                # real_total_loss.append(real_loss.item())
                 
-                loss.backward()
+                scaled_loss.backward()
+                # real_loss.backward()
                 model_optim.step()
 
-            train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
-            test_loss = self.vali(test_data, test_loader, criterion)
+            train_scaled_loss = np.average(scaled_total_loss)
+            # train_real_loss = np.average(real_total_loss)
+            vali_scaled_loss, vali_real_loss = self.vali(vali_data, vali_loader, criterion, train_data.scaler)
+            test_scaled_loss, test_real_loss = self.vali(test_data, test_loader, criterion, train_data.scaler)
 
-            print("Train Loss: {0:.7f}, Vali Loss: {1:.7f}, Test Loss: {2:.7f}".format(train_loss, vali_loss, test_loss))
-            early_stopping(vali_loss, self.model, path)
+            history['scaled']['train'].append(train_scaled_loss)
+            history['scaled']['vali'].append(vali_scaled_loss)
+            history['scaled']['test'].append(test_scaled_loss)
+
+            # history['real']['train'].append(train_real_loss)
+            # history['real']['vali'].append(vali_real_loss)
+            # history['real']['test'].append(test_real_loss)
+
+            print(f"Train Loss: {train_scaled_loss:.5f}, Vali Loss: {vali_scaled_loss:.5f}, Test Loss: {test_scaled_loss:.5f},")
+            # print(f"Train Scaled Loss: {train_scaled_loss:.5f}, Train Real Loss: {train_real_loss:.5f} | \
+            #     Vali Scaled Loss: {vali_scaled_loss:.5f}, Vali Real Loss: {vali_real_loss:.5f} | \
+            #     Test Scaled Loss: {test_scaled_loss:.5f}, Test Real Loss: {test_real_loss:.5f},")
+            
+            early_stopping(vali_scaled_loss, self.model, path)
             if early_stopping.early_stop:
                 print("Early stopping\n")
                 break
+            
+            learning_rate = adjust_learning_rate(model_optim, epoch+1, self.args)
+            history['learning_rate'].append(learning_rate)
 
-            adjust_learning_rate(model_optim, epoch+1, self.args)
-            print("")
+            plot_figure(path, history, self.args)
 
-        best_model_path = path+'/'+'checkpoint.pth'
+        best_model_path = f"{path}/checkpoint.pth"
         self.model.load_state_dict(torch.load(best_model_path))
         
         return self.model
@@ -217,9 +251,10 @@ class Exp_Informer(Exp_Basic):
         preds = []
         trues = []
         
-        for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(test_loader):
+        for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
             batch_x = batch_x.double().to(self.device)
             batch_y = batch_y.double()
+
             batch_x_mark = batch_x_mark.double().to(self.device)
             batch_y_mark = batch_y_mark.double().to(self.device)
 
@@ -231,7 +266,8 @@ class Exp_Informer(Exp_Basic):
                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
             else:
                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-            f_dim = -1 if self.args.features=='MS' else 0
+            
+            f_dim = -1 if self.args.features == 'MS' else 0
             batch_y = batch_y[:,-self.args.pred_len:,f_dim:].to(self.device)
             
             pred = outputs.detach().cpu().numpy()#.squeeze()
@@ -248,15 +284,50 @@ class Exp_Informer(Exp_Basic):
         print('test shape:', preds.shape, trues.shape)
 
         # result save
-        folder_path = './results/' + setting +'/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+        saving_directory = f"results/{setting}/"
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
-        print('mse:{}, mae:{}'.format(mse, mae))
+        # print('mse: {}, mae: {}, rmse: {}, mape: {}, mspe: {}'.format(mse, mae, rmse, mape, mspe))
+        print('MSE: {} | MAE: {}'.format(mse, mae))
 
-        np.save(folder_path+'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path+'pred.npy', preds)
-        np.save(folder_path+'true.npy', trues)
+        np.save(f"{saving_directory}/metrics.npy", np.array([mae, mse, rmse, mape, mspe]))
+        # np.save(f"{saving_directory}/predictions.npy", preds)
+        # np.save(f"{saving_directory}/truths.npy", trues)
 
+        return
+
+
+    # Add by Aisu
+    def predict(self, saving_directory):
+
+        preds = []
+        
+        predict_data, predict_loader = self._get_data(flag='predict')
+        for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(predict_loader):
+            batch_x = batch_x.double().to(self.device)
+            batch_y = batch_y.double()
+            batch_x_mark = batch_x_mark.double().to(self.device)
+            batch_y_mark = batch_y_mark.double().to(self.device)
+
+            print(batch_y)
+
+            # decoder input
+            dec_inp = torch.zeros_like(batch_y[:,-self.args.pred_len:,:]).double()
+            dec_inp = torch.cat([batch_y[:,:self.args.label_len,:], dec_inp], dim=1).double().to(self.device)
+            # encoder - decoder
+            if self.args.output_attention:
+                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+            else:
+                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+
+            pred = outputs.detach().cpu().numpy()#.squeeze()
+            preds.append(pred)
+
+        preds = np.array(preds)
+        print('predict shape:', preds.shape)
+        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
+        print('predict shape:', preds.shape)
+
+        # predict save
+        np.save(f"{saving_directory}/last_prediction.npy", preds[-1])
         return
