@@ -12,7 +12,19 @@ def show_metrics():
         try: data = np.load(f"results/{result}/metrics.npy")
         except: continue
         print(f"Metrics of {result}:")
-        print(f"MSE: {data[1]:.8f} | MAE: {data[0]:.8f}\n")
+        print(f"MSE: {data[1]:12.8f} | MAE: {data[0]:10.8f}\n")
+    return
+
+def show_pred():
+    for result in result_list:
+        try:
+            predictions = np.load(f"results/{result}/predictions.npy")
+        except:
+            continue
+        print(f"Predictions & truths of {result}:")
+        for i in range(len(predictions[-1, :, 0])):
+            print(f"{float(predictions[-1][i])} | ", end='')
+        print('\n')
     return
 
 def show_pred_truths():
@@ -34,5 +46,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.act == 'metrics': show_metrics()
+    elif args.act == 'pred': show_pred()
     elif args.act == 'pred_truths': show_pred_truths()
     else: print('Wrong args.')

@@ -11,7 +11,7 @@ def plot_figure(path, historty, args):
     epochs_length = range(1, len(historty['scaled']['train'])+1)
 
     x_limit = int(len(historty['scaled']['train']) / 10) * 10 + 10.01
-    y1_limit = max(historty['scaled']['test']) + 400.01
+    y1_limit = min(max(historty['scaled']['test']) + 300.01, 3000.01)
 
     x_ticks_major = np.arange(0, x_limit, 10)
     x_ticks_major[0] = 1
