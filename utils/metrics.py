@@ -8,11 +8,11 @@ def CORR(pred, true):
     d = np.sqrt(((true-true.mean(0))**2*(pred-pred.mean(0))**2).sum(0))
     return (u/d).mean(-1)
 
-def MAE(pred, true):
-    return np.mean(np.abs(pred-true))
-
 def MSE(pred, true):
     return np.mean((pred-true)**2)
+
+def MAE(pred, true):
+    return np.mean(np.abs(pred-true))
 
 def RMSE(pred, true):
     return np.sqrt(MSE(pred, true))
@@ -24,10 +24,10 @@ def MSPE(pred, true):
     return np.mean(np.square((pred - true) / true))
 
 def metric(pred, true):
-    mae  = MAE(pred, true)
     mse  = MSE(pred, true)
+    mae  = MAE(pred, true)
     rmse = RMSE(pred, true)
     mape = MAPE(pred, true)
     mspe = MSPE(pred, true)
     
-    return mae, mse, rmse, mape, mspe
+    return mse, mae, rmse, mape, mspe
