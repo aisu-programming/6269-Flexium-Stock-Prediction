@@ -27,9 +27,9 @@ if __name__ == '__main__':
     parser.add_argument('--scale', type=bool, default=False, help='scale the dataset (Add by Aisu)')  # Add by Aisu
     parser.add_argument('--freq', type=str, default='d', help='freq for time features encoding, options:[t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly]')
 
-    parser.add_argument('--seq_len', type=int, default=30, help='input sequence length of Informer encoder')
-    parser.add_argument('--label_len', type=int, default=20, help='start token length of Informer decoder')
-    parser.add_argument('--pred_len', type=int, default=1, help='prediction sequence length')
+    parser.add_argument('--seq_len', type=int, default=60, help='input sequence length of Informer encoder')
+    parser.add_argument('--label_len', type=int, default=40, help='start token length of Informer decoder')
+    parser.add_argument('--pred_len', type=int, default=5, help='prediction sequence length')
     # Informer decoder input: concat[start token series(label_len), zero padding series(pred_len)]
 
     parser.add_argument('--enc_in', type=int, default=36, help='encoder input size')
@@ -54,8 +54,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=5, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=20, help='early stopping patience')
     parser.add_argument('--loss', type=str, default='mse', help='loss function')
-    parser.add_argument('--learning_rate', type=float, default=0.005, help='optimizer learning rate')
-    parser.add_argument('--lradj', type=str, default='1.05', help='adjust learning rate')
+    parser.add_argument('--learning_rate', type=float, default=0.05, help='optimizer learning rate')
+    parser.add_argument('--lradj', type=str, default='0.95', help='adjust learning rate')
 
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
     parser.add_argument('--gpu', type=int, default=0, help='gpu')

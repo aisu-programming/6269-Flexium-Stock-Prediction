@@ -149,9 +149,9 @@ class Exp_Informer(Exp_Basic):
         return scaled_loss, None
         
     def train(self, setting):
-        train_data, train_loader = self._get_data(flag = 'train')
-        vali_data, vali_loader = self._get_data(flag = 'val')
-        test_data, test_loader = self._get_data(flag = 'test')
+        train_data, train_loader = self._get_data(flag='train')
+        vali_data,  vali_loader  = self._get_data(flag='val')
+        test_data,  test_loader  = self._get_data(flag='test')
         print("")
 
         path = f"results/{setting}"
@@ -309,8 +309,6 @@ class Exp_Informer(Exp_Basic):
             batch_x_mark = batch_x_mark.double().to(self.device)
             batch_y_mark = batch_y_mark.double().to(self.device)
 
-            print(batch_y)
-
             # decoder input
             dec_inp = torch.zeros_like(batch_y[:,-self.args.pred_len:,:]).double()
             dec_inp = torch.cat([batch_y[:,:self.args.label_len,:], dec_inp], dim=1).double().to(self.device)
@@ -324,10 +322,11 @@ class Exp_Informer(Exp_Basic):
             preds.append(pred)
 
         preds = np.array(preds)
-        print('predict shape:', preds.shape)
+        # print('predict shape:', preds.shape)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
-        print('predict shape:', preds.shape)
+        # print('predict shape:', preds.shape)
 
+        print(preds[-1])
         # predict save
         np.save(f"{saving_directory}/last_prediction.npy", preds[-1])
         return

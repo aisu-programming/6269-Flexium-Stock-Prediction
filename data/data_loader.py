@@ -230,8 +230,8 @@ class Dataset_Custom(Dataset):
         df_raw = df_raw[cols+[self.target]]
 
         df_raw_len = len(df_raw) - self.pred_len
-        num_train = int(df_raw_len * 0.799)
-        num_test = int(df_raw_len * 0.054)
+        num_train = int(df_raw_len * 0.838)
+        num_test = int(df_raw_len * 0.067)
         num_vali = df_raw_len - num_train - num_test
 
         border1s = [

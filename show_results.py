@@ -12,7 +12,7 @@ def show_metrics():
         try: data = np.load(f"results/{result}/metrics.npy")
         except: continue
         print(f"Metrics of {result}:")
-        print(f"MSE: {data[1]:12.8f} | MAE: {data[0]:10.8f}\n")
+        print(f"MSE: {data[1]:13.8f} | MAE: {data[0]:11.8f}\n")
     return
 
 def show_pred():
